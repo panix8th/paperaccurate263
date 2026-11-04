@@ -1,3 +1,10 @@
+> **26.3 build** — this branch is a port of
+> [hxrry27/PaperAccurateBlockPlacement](https://github.com/hxrry27/PaperAccurateBlockPlacement) to Minecraft /
+> Paper **26.3**. Requirements: Paper (or a fork) 26.3, Java 25 and
+> [packetevents](https://modrinth.com/plugin/packetevents) **2.14.0 or newer** (the first release with 26.3
+> support). Grab the jar from the latest run of the `build` workflow (Actions tab → `PaperAccurateBlockPlacement-mc26.3`
+> artifact) or build it yourself with `./gradlew build` (jar ends up in `build/libs/`).
+
 ## what it do
 implements the easyPlace and accurateBlockPlacement protocols (v2, v3 and auto) for paper based servers, so that 
 litematica's easyPlace and tweakeroo's flexible/accurate block placement reproduce the correct block
@@ -18,7 +25,7 @@ other project [tinker](https://modrinth.com/plugin/tinker)
 build is 26.2, and i'm not currently backporting (considering it though as the downloads are picking up!)
 - **server software**: paper, purpur and any other paper derivative ones like pufferfish etc.
 - **[packetevents](https://modrinth.com/plugin/packetevents)**: make sure you pick the compatible version 
-for your mc version, the abp version will work with that (26.2, 26.1 etc.)
+for your mc version, the abp version will work with that (26.3 needs packetevents 2.14.0+, 26.2 needs 2.13.0, etc.)
 
 provided you leave the config as 'v3' everything you want will be available to you, should you then leave your mod
 settings on their default 'Auto' mode 
