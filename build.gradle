@@ -2,28 +2,45 @@ plugins {
     id 'java'
 }
 
-group 'net.dungeondev'
-version '1.5.0+mc26.3'
+group = 'net.dungeondev'
+version = '1.5.0+mc26.3'
 
 repositories {
     mavenCentral()
-    maven { url 'https://repo.papermc.io/repository/maven-public/' }
-    maven { url 'https://repo.codemc.io/repository/maven-releases/' }
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+    maven { url = 'https://repo.codemc.io/repository/maven-releases/' }
 }
 
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.0'
 
     compileOnly 'io.papermc.paper:paper-api:26.3.build.+'
     compileOnly 'com.github.retrooper:packetevents-spigot:2.14.0'
 }
 
+// Paper 26.x runs on Java 25. The toolchain lets Gradle itself run on any JDK 17+ and
+// still compile with 25 (auto-provisioned via the foojay resolver in settings.gradle).
 def targetJavaVersion = 25
 java {
-    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
-    sourceCompatibility = javaVersion
-    targetCompatibility = javaVersion
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = targetJavaVersion
+}
+
+// keep the version in paper-plugin.yml in sync with the gradle version (without the +mc suffix)
+processResources {
+    def pluginVersion = project.version.toString().split('\\+')[0]
+    inputs.property 'pluginVersion', pluginVersion
+    filesMatching('paper-plugin.yml') {
+        expand 'pluginVersion': pluginVersion
+    }
 }
 
 test {

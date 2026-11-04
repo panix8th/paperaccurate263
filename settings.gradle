@@ -1,2 +1,6 @@
-rootProject.name = 'PaperAccurateBlockPlacement'
+plugins {
+    // lets the Java 25 toolchain be downloaded automatically if it isn't installed locally
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
 
+rootProject.name = 'PaperAccurateBlockPlacement'

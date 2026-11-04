@@ -1,5 +1,5 @@
 name: PaperAccurateBlockPlacement
-version: 1.5.0
+version: '${pluginVersion}'
 main: net.dungeondev.accurateblockplacement.AccurateBlockPlacement
 description: Implements the Carpet AccurateBlockPlacement protocol on Paper
 author: hxrry27 (forked from DungeonDev)
@@ -7,7 +7,10 @@ api-version: 26.3
 dependencies:
   server:
     packetevents:
+      # packetevents must be loaded first: we register on its shared API instance
+      load: BEFORE
       required: true
+      join-classpath: true
 
 commands:
   abp:
