@@ -1,13 +1,16 @@
 name: release
-# Builds the plugin, boot-tests it on Paper and publishes a GitHub release with the jar attached.
-#  - Actions tab -> release -> "Run workflow": the tag is v<version from build.gradle> (e.g. v1.5.0+mc26.3),
-#    created on the commit the workflow runs on
-#  - or push a tag like v1.5.0+mc26.3 yourself (it has to match the version in build.gradle)
-# Release notes come from .github/release-notes/<tag>.md if that exists, otherwise from the annotated tag
-# message (tag push) or GitHub's generated notes.
+# Builds the plugin, boot-tests it on Paper and publishes a GitHub release with the jar attached. Ways to
+# cut a release (the tag is v<version from build.gradle>, e.g. v1.5.0+mc26.3):
+#  - add/edit .github/release-notes/<tag>.md on the default branch: publishes that version if the notes
+#    match the version in build.gradle and it isn't released yet (the notes become the release text)
+#  - Actions tab -> release -> "Run workflow"
+#  - push a tag like v1.5.0+mc26.3 yourself (it has to match the version in build.gradle)
+# Without a notes file the text comes from the annotated tag message (tag push) or GitHub's generated notes.
 on:
   push:
+    branches: ['**']
     tags: ['v*']
+    paths: ['.github/release-notes/**']   # not evaluated for tag pushes
   workflow_dispatch:
 
 permissions:
@@ -18,6 +21,8 @@ env:
 
 jobs:
   release:
+    # branch pushes only release from the default branch
+    if: github.event_name != 'push' || github.ref_type == 'tag' || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -38,6 +43,9 @@ jobs:
         run: ./gradlew build --stacktrace
       - name: work out the release tag
         id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           shopt -s nullglob
           jars=(build/libs/PaperAccurateBlockPlacement-*.jar)
@@ -56,18 +64,34 @@ jobs:
           else
             tag="v$version"
           fi
-          echo "release tag: $tag, jar: ${jars[0]}"
+          publish=true
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = branch ]; then
+            if [ ! -f ".github/release-notes/$tag.md" ]; then
+              echo "::notice::no .github/release-notes/$tag.md for the current version, not releasing"
+              publish=false
+            elif gh release view "$tag" >/dev/null 2>&1; then
+              echo "::notice::release $tag already exists, not releasing it again"
+              publish=false
+            fi
+          fi
+          echo "release tag: $tag, jar: ${jars[0]}, publish: $publish"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "jar=${jars[0]}" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
       - name: boot-test on paper ${{ env.MC_VERSION }}
+        if: steps.tag.outputs.publish == 'true'
+        env:
+          JAR: ${{ steps.tag.outputs.jar }}
         run: |
           mkdir -p server/plugins
-          cp "${{ steps.tag.outputs.jar }}" server/plugins/
+          cp "$JAR" server/plugins/
           bash .github/scripts/fetch-server.sh server
           bash .github/scripts/server-test.sh server
       - name: publish release
+        if: steps.tag.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.tag.outputs.tag }}
           JAR: ${{ steps.tag.outputs.jar }}
         run: |
