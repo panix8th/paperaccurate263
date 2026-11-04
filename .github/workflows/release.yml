@@ -1,9 +1,14 @@
 name: release
-# push a tag like v1.5.0+mc26.3 (annotated; its message becomes the release notes) to build,
-# boot-test and publish a GitHub release with the plugin jar attached
+# Builds the plugin, boot-tests it on Paper and publishes a GitHub release with the jar attached.
+#  - Actions tab -> release -> "Run workflow": the tag is v<version from build.gradle> (e.g. v1.5.0+mc26.3),
+#    created on the commit the workflow runs on
+#  - or push a tag like v1.5.0+mc26.3 yourself (it has to match the version in build.gradle)
+# Release notes come from .github/release-notes/<tag>.md if that exists, otherwise from the annotated tag
+# message (tag push) or GitHub's generated notes.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -31,25 +36,54 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
       - name: build
         run: ./gradlew build --stacktrace
-      - name: check the jar version matches the tag
+      - name: work out the release tag
+        id: tag
         run: |
-          jar="build/libs/PaperAccurateBlockPlacement-${GITHUB_REF_NAME#v}.jar"
-          ls -la build/libs
-          test -f "$jar" || { echo "::error::expected $jar for tag $GITHUB_REF_NAME"; exit 1; }
+          shopt -s nullglob
+          jars=(build/libs/PaperAccurateBlockPlacement-*.jar)
+          if [ "${#jars[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one plugin jar, got: ${jars[*]}"
+            exit 1
+          fi
+          version=$(basename "${jars[0]}" .jar)
+          version=${version#PaperAccurateBlockPlacement-}
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+            if [ "$tag" != "v$version" ]; then
+              echo "::error::tag $tag doesn't match the jar version $version"
+              exit 1
+            fi
+          else
+            tag="v$version"
+          fi
+          echo "release tag: $tag, jar: ${jars[0]}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "jar=${jars[0]}" >> "$GITHUB_OUTPUT"
       - name: boot-test on paper ${{ env.MC_VERSION }}
         run: |
           mkdir -p server/plugins
-          cp build/libs/*.jar server/plugins/
+          cp "${{ steps.tag.outputs.jar }}" server/plugins/
           bash .github/scripts/fetch-server.sh server
           bash .github/scripts/server-test.sh server
       - name: publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          JAR: ${{ steps.tag.outputs.jar }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" --clobber build/libs/*.jar
-          else
-            gh release create "$TAG" build/libs/*.jar --verify-tag --notes-from-tag \
-              --title "PaperAccurateBlockPlacement ${TAG#v}"
+            echo "release $TAG already exists, replacing its jar"
+            gh release upload "$TAG" --clobber "$JAR"
+            exit 0
           fi
+          notes=".github/release-notes/$TAG.md"
+          if [ -f "$notes" ]; then
+            notes_args=(--notes-file "$notes")
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            notes_args=(--notes-from-tag)
+          else
+            notes_args=(--generate-notes)
+          fi
+          gh release create "$TAG" "$JAR" --target "$GITHUB_SHA" \
+            --title "PaperAccurateBlockPlacement ${TAG#v}" "${notes_args[@]}"
+          gh release view "$TAG"
