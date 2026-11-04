@@ -9,8 +9,6 @@ cd "$dir"
 echo "eula=true" > eula.txt
 cat > server.properties <<'PROPS'
 online-mode=false
-level-type=minecraft\:flat
-generate-structures=false
 spawn-protection=0
 PROPS
 
@@ -67,9 +65,11 @@ check_absent() {
 
 check "packetevents enabled" 'Enabling packetevents'
 check "plugin enabled" 'PaperAccurateBlockPlacement loaded! Protocol: v3'
-check "/abp prints the version" 'PaperAccurateBlockPlacement v[0-9]'
+# the command reply is a bare console line, unlike the "[PaperAccurateBlockPlacement] Enabling ... v1.5.0" log lines
+check "/abp prints the version" 'INFO\]: PaperAccurateBlockPlacement v[0-9]'
 check "/abp reload works" 'PaperAccurateBlockPlacement config reloaded'
 check_absent "no load/enable errors" 'Could not load .*PaperAccurateBlockPlacement|Error occurred while (enabling|disabling) PaperAccurateBlockPlacement|Error occurred while (enabling|disabling) packetevents|Unknown or incomplete command'
 check_absent "no plugin exceptions" '(Exception|Error).*(accurateblockplacement|packetevents)'
+check_absent "no ERROR lines in the server log" '^\[[0-9:]+ ERROR\]'
 
 exit $status
