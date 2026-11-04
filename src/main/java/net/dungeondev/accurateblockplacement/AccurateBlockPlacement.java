@@ -2,6 +2,7 @@ package net.dungeondev.accurateblockplacement;
 
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListenerAbstract;
+import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
@@ -12,7 +13,6 @@ import com.github.retrooper.packetevents.util.Vector3i;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerBlockPlacement;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPluginMessage;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPluginMessage;
-import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import org.bukkit.Axis;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -70,12 +70,15 @@ public class AccurateBlockPlacement extends JavaPlugin implements Listener {
 
 	private final Set<UUID> greeted = ConcurrentHashMap.newKeySet();
 
+	private PacketListenerCommon packetListener;
+
 	@Override
 	public void onLoad() {
-		PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this));
-		PacketEvents.getAPI().load();
-
-		PacketEvents.getAPI().getEventManager().registerListener(
+		// packetevents is a separate plugin (load: BEFORE in paper-plugin.yml) that owns the shared API
+		// instance, so only register on it. creating our own instance with setAPI()/load()/init() would
+		// replace the shared one and leave other packetevents plugins (and possibly us) on a dead instance,
+		// depending on plugin load order.
+		packetListener = PacketEvents.getAPI().getEventManager().registerListener(
 				new PacketListenerAbstract(PacketListenerPriority.LOWEST) {
 					@Override
 					public void onPacketReceive(PacketReceiveEvent event) {
@@ -91,8 +94,6 @@ public class AccurateBlockPlacement extends JavaPlugin implements Listener {
 
 	@Override
 	public void onEnable() {
-		PacketEvents.getAPI().init();
-
 		saveDefaultConfig();
 		config = getConfig();
 		loadSettings();
@@ -135,8 +136,10 @@ public class AccurateBlockPlacement extends JavaPlugin implements Listener {
 		playerPacketDataHashMap.clear();
 		greeted.clear();
 
-		if (PacketEvents.getAPI() != null) {
-			PacketEvents.getAPI().terminate();
+		// don't terminate() the shared API, that belongs to the packetevents plugin
+		if (packetListener != null && PacketEvents.getAPI() != null) {
+			PacketEvents.getAPI().getEventManager().unregisterListener(packetListener);
+			packetListener = null;
 		}
 	}
 
