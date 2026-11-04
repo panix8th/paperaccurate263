@@ -1,15 +1,22 @@
 name: release
+# push a tag like v1.5.0+mc26.3 (annotated; its message becomes the release notes) to build,
+# boot-test and publish a GitHub release with the plugin jar attached
 on:
-  release:
-    types: [published]
+  push:
+    tags: ['v*']
 
 permissions:
   contents: write
 
+env:
+  MC_VERSION: "26.3"
+
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      USER_AGENT: "paperaccurate263-ci (https://github.com/${{ github.repository }})"
     steps:
       - name: checkout repository
         uses: actions/checkout@v5
@@ -24,8 +31,25 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
       - name: build
         run: ./gradlew build --stacktrace
-      - name: attach jar to release
+      - name: check the jar version matches the tag
+        run: |
+          jar="build/libs/PaperAccurateBlockPlacement-${GITHUB_REF_NAME#v}.jar"
+          ls -la build/libs
+          test -f "$jar" || { echo "::error::expected $jar for tag $GITHUB_REF_NAME"; exit 1; }
+      - name: boot-test on paper ${{ env.MC_VERSION }}
+        run: |
+          mkdir -p server/plugins
+          cp build/libs/*.jar server/plugins/
+          bash .github/scripts/fetch-server.sh server
+          bash .github/scripts/server-test.sh server
+      - name: publish release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" --clobber build/libs/*.jar
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" --clobber build/libs/*.jar
+          else
+            gh release create "$TAG" build/libs/*.jar --verify-tag --notes-from-tag \
+              --title "PaperAccurateBlockPlacement ${TAG#v}"
+          fi

@@ -2,8 +2,8 @@
 > [hxrry27/PaperAccurateBlockPlacement](https://github.com/hxrry27/PaperAccurateBlockPlacement) to Minecraft /
 > Paper **26.3**. Requirements: Paper (or a fork) 26.3, Java 25 and
 > [packetevents](https://modrinth.com/plugin/packetevents) **2.14.0 or newer** (the first release with 26.3
-> support). Grab the jar from the latest run of the `build` workflow (Actions tab → `PaperAccurateBlockPlacement-mc26.3`
-> artifact) or build it yourself with `./gradlew build` (jar ends up in `build/libs/`).
+> support). Download the jar from the [releases](https://github.com/panix8th/paperaccurate263/releases) page, or build it yourself with
+> `./gradlew build` (jar ends up in `build/libs/`).
 
 ## what it do
 implements the easyPlace and accurateBlockPlacement protocols (v2, v3 and auto) for paper based servers, so that 
