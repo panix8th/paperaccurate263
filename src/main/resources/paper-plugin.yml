@@ -12,10 +12,7 @@ dependencies:
       required: true
       join-classpath: true
 
-commands:
-  abp:
-    description: PaperAcurateBlockPlacement commands
-    usage: /abp [reload]
+# /abp [reload] is registered in code: paper-plugin.yml has no commands section
 
 permissions:
   accurateblockplacement.reload:

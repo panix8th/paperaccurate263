@@ -13,6 +13,9 @@ import com.github.retrooper.packetevents.util.Vector3i;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerBlockPlacement;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPluginMessage;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPluginMessage;
+import io.papermc.paper.command.brigadier.BasicCommand;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.Axis;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -27,7 +30,6 @@ import org.bukkit.block.data.type.Chest;
 import org.bukkit.block.data.type.Comparator;
 import org.bukkit.block.data.type.Repeater;
 import org.bukkit.block.data.type.Stairs;
-import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -40,6 +42,9 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +60,7 @@ public class AccurateBlockPlacement extends JavaPlugin implements Listener {
 	private static final int CARPET_PROTOCOL_VERSION = 69;
 	private static final String BRAND = "PAPER-ABP";
 	private static final float PROTOCOL_CURSOR_THRESHOLD = 2.0f;
+	private static final String RELOAD_PERMISSION = "accurateblockplacement.reload";
 
 	private FileConfiguration config;
 
@@ -101,6 +107,11 @@ public class AccurateBlockPlacement extends JavaPlugin implements Listener {
 		getLogger().info("PaperAccurateBlockPlacement loaded! Protocol: " + (useV3 ? "v3" : "v2"));
 
 		getServer().getPluginManager().registerEvents(this, this);
+
+		// paper plugins can't declare commands in paper-plugin.yml (that section is silently ignored, so /abp
+		// never existed), they have to be registered through the lifecycle API instead
+		getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> event.registrar()
+				.register("abp", "PaperAccurateBlockPlacement commands", new AbpCommand()));
 	}
 
 	private void loadSettings() {
@@ -143,27 +154,34 @@ public class AccurateBlockPlacement extends JavaPlugin implements Listener {
 		}
 	}
 
-	@Override
-	public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label,
-			@NotNull String[] args) {
-		if (command.getName().equalsIgnoreCase("abp")) {
+	private final class AbpCommand implements BasicCommand {
+		@Override
+		public void execute(@NotNull CommandSourceStack source, @NotNull String[] args) {
+			CommandSender sender = source.getSender();
 			if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
-				if (!sender.hasPermission("accurateblockplacement.reload")) {
-					sender.sendMessage("<red>You don't have permission to reload the config!</red>");
-					return true;
+				if (!sender.hasPermission(RELOAD_PERMISSION)) {
+					sender.sendRichMessage("<red>You don't have permission to reload the config!</red>");
+					return;
 				}
 
 				reloadConfig();
 				config = getConfig();
 				loadSettings();
-				sender.sendMessage("<green>PaperAccurateBlockPlacement config reloaded</green>");
-				return true;
+				sender.sendRichMessage("<green>PaperAccurateBlockPlacement config reloaded</green>");
+				return;
 			}
 
 			sender.sendMessage("PaperAccurateBlockPlacement v" + getPluginMeta().getVersion());
-			return true;
 		}
-		return false;
+
+		@Override
+		public @NotNull Collection<String> suggest(@NotNull CommandSourceStack source, @NotNull String[] args) {
+			String typed = args.length == 0 ? "" : args[0].toLowerCase(Locale.ROOT);
+			if (args.length <= 1 && "reload".startsWith(typed) && source.getSender().hasPermission(RELOAD_PERMISSION)) {
+				return List.of("reload");
+			}
+			return List.of();
+		}
 	}
 
 	private void debug(String message) {
